@@ -1,0 +1,16 @@
+category,our_auroc,paper_auroc,delta
+bottle,99.9,99.6,0.3
+cable,98.2,99.5,-1.3
+capsule,80.2,98.1,-17.9
+carpet,100.0,98.7,1.3
+grid,83.0,98.2,-15.2
+hazelnut,100.0,99.9,0.1
+leather,100.0,100.0,0.0
+metal_nut,99.9,99.9,-0.0
+pill,95.6,96.6,-1.0
+screw,81.4,98.1,-16.7
+tile,99.9,98.7,1.2
+toothbrush,87.5,100.0,-12.5
+transistor,98.4,99.6,-1.2
+wood,98.1,99.2,-1.1
+zipper,90.0,99.4,-9.4
