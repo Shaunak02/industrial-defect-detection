@@ -7,6 +7,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.dataloader import get_dataloaders
 from src.patchcore import PatchCore
 from sklearn.metrics import roc_auc_score
+from src.visualize import visualize_results
+import joblib
+
 
 def train_and_evaluate(category, data_root="./data"):
     print(f"\n{'='*50}")
@@ -17,9 +20,42 @@ def train_and_evaluate(category, data_root="./data"):
 
     model = PatchCore(device="cpu")  # change to "cpu" if no GPU
     model.fit(train_loader)
+    # Save immediately after fitting — before evaluation
+    # This way even if evaluation crashes, the model is preserved
+    model.save(f"./results/{category}/model.pkl")
+
 
     print("\nEvaluating on test set...")
-    scores, _ = model.predict(test_loader)
+    scores, maps = model.predict(test_loader)
+
+    # Collect labels to compute calibration stats
+    labels = []
+    for batch in test_loader:
+        labels.extend(batch["label"].numpy())
+    labels = np.array(labels)
+
+    normal_scores   = scores[labels == 0]
+    defective_scores = scores[labels == 1]
+
+    # Save calibration alongside the model
+    calibration = {
+        "threshold":  float(np.mean([normal_scores.max(), defective_scores.min()])),
+        "score_min":  float(scores.min()),
+        "score_max":  float(scores.max()),
+    }
+    joblib.dump(calibration, f"./results/{category}/calibration.pkl")
+    print(f"  Threshold calibrated at: {calibration['threshold']:.4f}")
+    print(f"  Normal scores:    {normal_scores.mean():.4f} ± {normal_scores.std():.4f}")
+    print(f"  Defective scores: {defective_scores.mean():.4f} ± {defective_scores.std():.4f}")
+
+    print(f"\nGenerating visualisations for {category}...")
+    visualize_results(
+    test_loader=test_loader,
+    anomaly_maps=maps,
+    category=category,
+    data_root=data_root,
+    n_samples=5      # save 5 defective examples per category
+)
 
     # Collect ground truth labels
     labels = []
@@ -33,14 +69,16 @@ def train_and_evaluate(category, data_root="./data"):
 
 
 
-# CATEGORIES = [
-#     "bottle", "cable", "capsule", "carpet", "grid",
-#     "hazelnut", "leather", "metal_nut", "pill", "screw",
-#     "tile", "toothbrush", "transistor", "wood", "zipper"
-# ]
+CATEGORIES = [
+    "bottle", "cable", "capsule", "carpet", "grid",
+    "hazelnut", "leather", "metal_nut", "pill", "screw",
+    "tile", "toothbrush", "transistor", "wood", "zipper"
+]
 
 # Temporarily 
-CATEGORIES = ["capsule", "grid", "screw"]
+# CATEGORIES = ["capsule", "grid", "screw"]
+
+# CATEGORIES = ["hazelnut"]
 
 PAPER_RESULTS = {
     "bottle": 99.6, "cable": 99.5, "capsule": 98.1, "carpet": 98.7,
