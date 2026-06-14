@@ -3,6 +3,8 @@ import torch.nn as nn
 import torchvision.models as models
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+import joblib
+from pathlib import Path
 
 class PatchCore:
     """
@@ -118,14 +120,14 @@ class PatchCore:
 
 
         ## Random sampling of patches
-        # n_keep = max(1, int(len(all_patches) * self.coreset_ratio))
-        # indices = np.random.choice(len(all_patches), n_keep, replace=False)
-        # self.memory_bank = all_patches[indices]
+        n_keep = max(1, int(len(all_patches) * self.coreset_ratio))
+        indices = np.random.choice(len(all_patches), n_keep, replace=False)
+        self.memory_bank = all_patches[indices]
 
 
         ## greedy sampling of patches for coreset
-        n_keep = max(1, int(len(all_patches) * self.coreset_ratio))
-        self.memory_bank = self._greedy_coreset(all_patches, n_keep)
+        # n_keep = max(1, int(len(all_patches) * self.coreset_ratio))
+        # self.memory_bank = self._greedy_coreset(all_patches, n_keep)
         print(f"  Memory bank size after coreset sampling: {self.memory_bank.shape[0]:,}")
 
         # Fit the nearest neighbour index
@@ -219,3 +221,47 @@ class PatchCore:
                 print(f"    Selected {i+1}/{n_samples} coreset points...")
         
         return features[selected]
+    
+
+    def save(self, path):
+        """
+        Save the memory bank and fitted KNN index to disk.
+        
+        Why joblib and not pickle? joblib is optimised for large numpy
+        arrays — it uses memory-mapped files internally, so saving and
+        loading a 40,000 × 512 float32 array is significantly faster
+        than pickle. It's the standard choice for sklearn objects too.
+        
+        Why not save the backbone? It's always loaded fresh from torchvision
+        with fixed ImageNet weights. Saving it would add ~200MB to every
+        model file for zero benefit.
+        """
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump({
+            "memory_bank": self.memory_bank,
+            "knn":         self.knn,
+        }, path)
+        print(f"  Model saved to {path}")
+
+    @classmethod
+    def load(cls, path, device="cpu"):
+        """
+        Load a saved PatchCore model.
+        
+        Why a classmethod? Because we need to create a new PatchCore
+        instance and populate it with saved state — we can't call this
+        on an existing instance since one doesn't exist yet. It's the
+        standard Python pattern for alternative constructors.
+        """
+        data = joblib.load(path)
+        
+        # Create a fresh instance — this rebuilds the backbone and hooks
+        model = cls(device=device)
+        
+        # Restore the saved state
+        model.memory_bank = data["memory_bank"]
+        model.knn         = data["knn"]
+        
+        print(f"  Model loaded from {path}")
+        return model
+        
