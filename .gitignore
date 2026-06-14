@@ -23,3 +23,9 @@ data/
 
 # Logs
 *.log
+
+# Results — keep metrics, skip large binaries
+results/*/model.pkl
+results/*/calibration.pkl
+results/*/images/
+results/*/visualizations/
